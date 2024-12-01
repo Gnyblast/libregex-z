@@ -52,11 +52,9 @@ pub const MatchIterator = struct {
 
 pub const ExecResult = struct {
     match_list: std.ArrayList([]const u8),
-    match_ptr: [*c]libregex.regmatch_t,
 
     pub fn deinit(self: ExecResult) void {
         self.match_list.deinit();
-        libregex.free_match_ptr(self.match_ptr);
     }
 };
 
@@ -90,6 +88,7 @@ pub const ExecIterator = struct {
 
         const input: [:0]const u8 = @ptrCast(self.input.items[self.offset..self.input.items.len]);
         const exec_result = libregex.exec(self.regex.inner, input, self.regex.re_nsub, 0);
+        defer libregex.free_match_ptr(exec_result.matches);
 
         if (exec_result.exec_code != 0) {
             if (exec_result.exec_code == libregex.REG_NOMATCH) return null;
@@ -98,7 +97,6 @@ pub const ExecIterator = struct {
         }
 
         var result = ExecResult{
-            .match_ptr = exec_result.matches,
             .match_list = std.ArrayList([]const u8).init(self.allocator),
         };
 
@@ -127,8 +125,8 @@ const Regex = struct {
     inner: *libregex.regex_t,
     re_nsub: c_ulonglong,
 
-    fn init(pattern: [:0]const u8) !Regex {
-        const res = libregex.compile_regex(pattern, libregex.REG_EXTENDED);
+    fn init(pattern: [:0]const u8, flags: c_int) !Regex {
+        const res = libregex.compile_regex(pattern, flags);
         if (res.compiled_regex == null) {
             return error.compile;
         }
@@ -178,14 +176,13 @@ test "full match iterator" {
         \\ The latest stable version is v2.1.0. If you are using an older verison of x then please use v1.12.2
         \\ You can also try the nightly version v2.2.0-beta-2
     ;
-    const expected: []const []const u8 = &[_][]const u8{ "v2.1.0", "v1.12.2", "v2.2.0" };
 
     var iterator = try r.getMatchIterator(std.testing.allocator, input);
     defer iterator.deinit();
 
-    for (expected) |e| {
-        try expect(std.mem.eql(u8, e, iterator.next().?));
-    }
+    try expect(std.mem.eql(u8, "v2.1.0", iterator.next().?));
+    try expect(std.mem.eql(u8, "v1.12.2", iterator.next().?));
+    try expect(std.mem.eql(u8, "v2.2.0", iterator.next().?));
 
     try expect(iterator.next() == null);
 }
