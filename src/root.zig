@@ -125,11 +125,13 @@ const Regex = struct {
     inner: *libregex.regex_t,
     re_nsub: c_ulonglong,
 
-    fn init(pattern: [:0]const u8, flags: c_int) !Regex {
-        const res = libregex.compile_regex(pattern, flags);
+    fn init(allocator: std.mem.Allocator, pattern: []const u8, flags: c_int) !Regex {
+        const c_str = try std.mem.Allocator.dupeZ(allocator, u8, pattern);
+        const res = libregex.compile_regex(c_str, flags);
         if (res.compiled_regex == null) {
             return error.compile;
         }
+        allocator.free(c_str);
 
         return .{
             .inner = res.compiled_regex.?,
@@ -160,7 +162,7 @@ const Regex = struct {
 };
 
 test "matches" {
-    const r = try Regex.init("^v[0-9]+.[0-9]+.[0-9]+");
+    const r = try Regex.init(std.testing.allocator, "^v[0-9]+.[0-9]+.[0-9]+", libregex.REG_EXTENDED);
     defer r.deinit();
 
     try expect(try r.matches("v1.2.3"));
@@ -169,7 +171,7 @@ test "matches" {
 }
 
 test "full match iterator" {
-    const r = try Regex.init("(v)([0-9]+.[0-9]+.[0-9]+)");
+    const r = try Regex.init(std.testing.allocator, "(v)([0-9]+.[0-9]+.[0-9]+)", libregex.REG_EXTENDED);
     defer r.deinit();
 
     const input: []const u8 =
@@ -188,7 +190,7 @@ test "full match iterator" {
 }
 
 test "exec iterator" {
-    const r = try Regex.init("(v)([0-9]+.[0-9]+.[0-9]+)");
+    const r = try Regex.init(std.testing.allocator, "(v)([0-9]+.[0-9]+.[0-9]+)", libregex.REG_EXTENDED);
     defer r.deinit();
 
     const input: []const u8 = "Latest stable version is v1.2.2. Latest version is v1.3.0";
