@@ -140,8 +140,13 @@ const Regex = struct {
         libregex.free_regex_t(self.inner);
     }
 
-    fn matches(self: Regex, input: [:0]const u8) bool {
-        return 0 == libregex.regexec(self.inner, input, 0, null, 0);
+    fn matches(self: Regex, input: [:0]const u8) !bool {
+        const result = libregex.regexec(self.inner, input, 0, null, 0);
+
+        if (result == 0) return true;
+        if (result == libregex.REG_NOMATCH) return false;
+
+        return error.OutOfMemory;
     }
 
     fn getMatchIterator(self: Regex, allocator: std.mem.Allocator, input: []const u8) !MatchIterator {
@@ -157,9 +162,9 @@ test "matches" {
     const r = try Regex.init("^v[0-9]+.[0-9]+.[0-9]+");
     defer r.deinit();
 
-    try expect(r.matches("v1.2.3"));
-    try expect(r.matches("v1.22.101"));
-    try expect(!r.matches("1.2.3"));
+    try expect(try r.matches("v1.2.3"));
+    try expect(try r.matches("v1.22.101"));
+    try expect(!try r.matches("1.2.3"));
 }
 
 test "full match iterator" {
