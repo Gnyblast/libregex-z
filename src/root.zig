@@ -112,34 +112,48 @@ const Regex = struct {
     }
 };
 
-test "better impl" {
+test "matches" {
     const r = try Regex.init("^v[0-9]+.[0-9]+.[0-9]+");
+    defer r.deinit();
 
     try expect(r.matches("v1.2.3"));
     try expect(r.matches("v1.22.101"));
     try expect(!r.matches("1.2.3"));
+}
 
-    const r2 = try Regex.init("(v)([0-9]+.[0-9]+.[0-9]+)");
+test "full match iterator" {
+    const r = try Regex.init("(v)([0-9]+.[0-9]+.[0-9]+)");
+    defer r.deinit();
 
-    try expect(r2.matches("v1.2.3"));
+    const input: []const u8 =
+        \\ The latest stable version is v2.1.0. If you are using an older verison of x then please use v1.12.2
+        \\ You can also try the nightly version v2.2.0-beta-2
+    ;
+    const expected: []const []const u8 = &[_][]const u8{ "v2.1.0", "v1.12.2", "v2.2.0" };
 
-    std.debug.print("re_nsub = {d}\n", .{r2.re_nsub});
+    var iterator = try r.getMatchIterator(std.testing.allocator, input);
+    defer iterator.deinit();
 
-    var iterator = try r2.getMatchIterator(std.testing.allocator, "v1.2.3 qenrfekrnf v2.3.4 3nfjfn v1.4.5");
-    var result: ?[]const u8 = iterator.next();
-
-    while (result != null) : (result = iterator.next()) {
-        std.debug.print("match = {s}\n", .{result.?});
+    for (expected) |e| {
+        try expect(std.mem.eql(u8, e, iterator.next().?));
     }
 
-    const exec_result = try r2.exec(std.testing.allocator, "Latest version is v1.2.2");
+    try expect(iterator.next() == null);
+}
 
-    std.debug.print("exec result: ", .{});
-    for (exec_result.match_list.items) |match| {
-        std.debug.print("{s} \t", .{match});
+test "exec" {
+    const r = try Regex.init("(v)([0-9]+.[0-9]+.[0-9]+)");
+    defer r.deinit();
+
+    const input: [:0]const u8 = "Latest stable version is v1.2.2. Latest version is v1.3.0";
+    const expected: []const []const u8 = &[_][]const u8{ "v1.2.2", "v", "1.2.2" };
+
+    const exec_result = try r.exec(std.testing.allocator, input);
+    defer exec_result.deinit();
+
+    for (exec_result.match_list.items, 0..) |match, i| {
+        try expect(std.mem.eql(u8, expected[i], match));
     }
-    std.debug.print("\n", .{});
 
-    exec_result.deinit();
-    iterator.deinit();
+    try expect(exec_result.match_list.items.len == expected.len);
 }
