@@ -5,5 +5,47 @@ Compatible with zig version `0.0.13`
 
 ## Installation
 1. Run `zig fetch --save https://github.com/skota-io/zig-regex`
-2. In your `build.zig`
+2. In your `build.zig` <br>
+todo
 
+## Usage
+### 1. Initialize
+```zig
+const libregex = @import("zig-regex-lib");
+const Regex = libregex.Regex;
+
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+const pattern = "(v)([0-9]+.[0-9]+.[0-9]+)";
+const regex = Regex.init(gpa.allocator(), pattern, libregex.REG_EXTENDED));
+defer regex.deinit();
+```
+
+### 2. Check if some input matches pattern
+```zig
+const expect = @import("std").testing.expect;
+
+try expect(try r.matches("v1.22.101"));
+try expect(!try r.matches("1.2.3"));
+```
+
+### 3. Get all matches in an input
+```zig
+const expect = @import("std").testing.expect;
+
+const input: []const u8 =
+    \\ The latest stable version is v2.1.0. If you are using an older verison of x then please use v1.12.2
+    \\ You can also try the nightly version v2.2.0-beta-2
+;
+
+var iterator = try r.getMatchIterator(input);
+defer iterator.deinit();
+
+try expect(std.mem.eql(u8, "v2.1.0", iterator.next().?));
+try expect(std.mem.eql(u8, "v1.12.2", iterator.next().?));
+try expect(std.mem.eql(u8, "v2.2.0", iterator.next().?));
+
+try expect(iterator.next() == null);
+```
+
+### 4. Find sub-expressions
+todo
