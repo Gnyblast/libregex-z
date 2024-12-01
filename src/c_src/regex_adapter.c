@@ -16,6 +16,10 @@ compile_result compile_regex(const char* pattern, int flags) {
     return result;
 }
 
+void free_match_ptr(regmatch_t* ptr) {
+    free(ptr);
+}
+
 exec_result exec(regex_t* ptr, const char* input, size_t re_nsub, int flags) {
     exec_result result;
 

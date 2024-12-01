@@ -52,9 +52,11 @@ pub const MatchIterator = struct {
 
 pub const ExecResult = struct {
     match_list: std.ArrayList([]const u8),
+    match_ptr: [*c]libregex.regmatch_t,
 
     pub fn deinit(self: ExecResult) void {
         self.match_list.deinit();
+        libregex.free_match_ptr(self.match_ptr);
     }
 };
 
@@ -96,6 +98,7 @@ pub const ExecIterator = struct {
         }
 
         var result = ExecResult{
+            .match_ptr = exec_result.matches,
             .match_list = std.ArrayList([]const u8).init(self.allocator),
         };
 

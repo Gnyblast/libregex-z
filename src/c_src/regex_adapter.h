@@ -17,3 +17,4 @@ compile_result compile_regex(const char* pattern, int flags);
 void free_regex_t(regex_t* ptr);
 
 exec_result exec(regex_t*, const char*, size_t, int);
+void free_match_ptr(regmatch_t*);
