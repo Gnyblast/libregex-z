@@ -50,6 +50,14 @@ pub const MatchIterator = struct {
     }
 };
 
+pub const ExecResult = struct {
+    match_list: std.ArrayList([]const u8),
+
+    pub fn deinit(self: ExecResult) void {
+        self.match_list.deinit();
+    }
+};
+
 const Regex = struct {
     inner: *libregex.regex_t,
     re_nsub: c_ulonglong,
@@ -74,27 +82,29 @@ const Regex = struct {
         return 0 == libregex.regexec(self.inner, input, 0, null, 0);
     }
 
-    fn exec(self: Regex, input: [:0]const u8) !void {
-        const match_size = 1;
-        var pmatch: [match_size]libregex.regmatch_t = undefined;
+    fn exec(self: Regex, allocator: std.mem.Allocator, input: [:0]const u8) !ExecResult {
+        const exec_result = libregex.exec(self.inner, input, self.re_nsub, 0);
 
-        var i: usize = 0;
-        var string = input;
-        const expected = [_][]const u8{ "John Do", "John Foo" };
-        while (true) {
-            if (0 != libregex.regexec(self.inner, string, match_size, &pmatch, 0)) {
-                break;
-            }
+        if (exec_result.exec_code != 0) {
+            std.debug.print("non zero exit code = {d}\n", .{exec_result.exec_code});
 
-            const slice = string[@as(usize, @intCast(pmatch[0].rm_so))..@as(usize, @intCast(pmatch[0].rm_eo))];
-
-            try std.testing.expectEqualStrings(expected[i], slice);
-
-            string = string[@intCast(pmatch[0].rm_eo)..];
-            i += 1;
+            return error.ExecError;
         }
 
-        try std.testing.expectEqual(i, 2);
+        var result = ExecResult{
+            .match_list = std.ArrayList([]const u8).init(allocator),
+        };
+
+        for (exec_result.matches, 0..exec_result.n_matches) |_, i| {
+            const pmatch = exec_result.matches[i];
+            const start = @as(usize, @intCast(pmatch.rm_so));
+            const end = @as(usize, @intCast(pmatch.rm_eo));
+            const match = input[start..end];
+
+            try result.match_list.append(match);
+        }
+
+        return result;
     }
 
     fn getMatchIterator(self: Regex, allocator: std.mem.Allocator, input: []const u8) !MatchIterator {
@@ -122,5 +132,14 @@ test "better impl" {
         std.debug.print("match = {s}\n", .{result.?});
     }
 
+    const exec_result = try r2.exec(std.testing.allocator, "Latest version is v1.2.2");
+
+    std.debug.print("exec result: ", .{});
+    for (exec_result.match_list.items) |match| {
+        std.debug.print("{s} \t", .{match});
+    }
+    std.debug.print("\n", .{});
+
+    exec_result.deinit();
     iterator.deinit();
 }
