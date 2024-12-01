@@ -58,6 +58,68 @@ pub const ExecResult = struct {
     }
 };
 
+pub const ExecIterator = struct {
+    regex: Regex,
+    allocator: std.mem.Allocator,
+    offset: usize,
+    input: std.ArrayList(u8),
+
+    pub fn init(allocator: std.mem.Allocator, r: Regex, input: []const u8) !ExecIterator {
+        var c_str = std.ArrayList(u8).init(allocator);
+        for (input) |char| try c_str.append(char);
+        try c_str.append(0);
+
+        return .{
+            .allocator = allocator,
+            .input = c_str,
+            .regex = r,
+            .offset = 0,
+        };
+    }
+
+    pub fn deinit(self: ExecIterator) void {
+        self.input.deinit();
+    }
+
+    pub fn next(self: *ExecIterator) !?ExecResult {
+        if (self.offset >= self.input.items.len) {
+            return null;
+        }
+
+        const input: [:0]const u8 = @ptrCast(self.input.items[self.offset..self.input.items.len]);
+        const exec_result = libregex.exec(self.regex.inner, input, self.regex.re_nsub, 0);
+
+        if (exec_result.exec_code != 0) {
+            if (exec_result.exec_code == libregex.REG_NOMATCH) return null;
+
+            return error.OutOfMemory;
+        }
+
+        var result = ExecResult{
+            .match_list = std.ArrayList([]const u8).init(self.allocator),
+        };
+
+        if (exec_result.matches[0].rm_so == exec_result.matches[0].rm_eo) {
+            return null;
+        }
+
+        for (exec_result.matches, 0..exec_result.n_matches) |_, i| {
+            const pmatch = exec_result.matches[i];
+            const start = @as(usize, @intCast(pmatch.rm_so));
+            const end = @as(usize, @intCast(pmatch.rm_eo));
+            const match = input[start..end];
+
+            if (i == 0) {
+                self.offset += start + 1;
+            }
+
+            try result.match_list.append(match);
+        }
+
+        return result;
+    }
+};
+
 const Regex = struct {
     inner: *libregex.regex_t,
     re_nsub: c_ulonglong,
@@ -82,33 +144,12 @@ const Regex = struct {
         return 0 == libregex.regexec(self.inner, input, 0, null, 0);
     }
 
-    fn exec(self: Regex, allocator: std.mem.Allocator, input: [:0]const u8) !ExecResult {
-        const exec_result = libregex.exec(self.inner, input, self.re_nsub, 0);
-
-        if (exec_result.exec_code != 0) {
-            std.debug.print("non zero exit code = {d}\n", .{exec_result.exec_code});
-
-            return error.ExecError;
-        }
-
-        var result = ExecResult{
-            .match_list = std.ArrayList([]const u8).init(allocator),
-        };
-
-        for (exec_result.matches, 0..exec_result.n_matches) |_, i| {
-            const pmatch = exec_result.matches[i];
-            const start = @as(usize, @intCast(pmatch.rm_so));
-            const end = @as(usize, @intCast(pmatch.rm_eo));
-            const match = input[start..end];
-
-            try result.match_list.append(match);
-        }
-
-        return result;
-    }
-
     fn getMatchIterator(self: Regex, allocator: std.mem.Allocator, input: []const u8) !MatchIterator {
         return MatchIterator.init(allocator, self, input);
+    }
+
+    fn getExecIterator(self: Regex, allocator: std.mem.Allocator, input: []const u8) !ExecIterator {
+        return ExecIterator.init(allocator, self, input);
     }
 };
 
@@ -141,19 +182,32 @@ test "full match iterator" {
     try expect(iterator.next() == null);
 }
 
-test "exec" {
+test "exec iterator" {
     const r = try Regex.init("(v)([0-9]+.[0-9]+.[0-9]+)");
     defer r.deinit();
 
-    const input: [:0]const u8 = "Latest stable version is v1.2.2. Latest version is v1.3.0";
-    const expected: []const []const u8 = &[_][]const u8{ "v1.2.2", "v", "1.2.2" };
+    const input: []const u8 = "Latest stable version is v1.2.2. Latest version is v1.3.0";
+    var expected: []const []const u8 = undefined;
+    var exec_result: ExecResult = undefined;
 
-    const exec_result = try r.exec(std.testing.allocator, input);
-    defer exec_result.deinit();
+    var exec_iterator = try r.getExecIterator(std.testing.allocator, input);
+    defer exec_iterator.deinit();
 
-    for (exec_result.match_list.items, 0..) |match, i| {
-        try expect(std.mem.eql(u8, expected[i], match));
+    expected = &[_][]const u8{ "v1.2.2", "v", "1.2.2" };
+    exec_result = (try exec_iterator.next()).?;
+    for (expected, 0..) |e, i| {
+        try expect(std.mem.eql(u8, e, exec_result.match_list.items[i]));
     }
+    exec_result.deinit();
+
+    expected = &[_][]const u8{ "v1.3.0", "v", "1.3.0" };
+    exec_result = (try exec_iterator.next()).?;
+    for (expected, 0..) |e, i| {
+        try expect(std.mem.eql(u8, e, exec_result.match_list.items[i]));
+    }
+    exec_result.deinit();
+
+    try expect(try exec_iterator.next() == null);
 
     try expect(exec_result.match_list.items.len == expected.len);
 }
