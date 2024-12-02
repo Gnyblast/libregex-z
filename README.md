@@ -48,4 +48,23 @@ try expect(iterator.next() == null);
 ```
 
 ### 4. Find sub-expressions
-todo
+```zig
+
+const input: []const u8 = "Latest stable version is v1.2.2. Latest version is v1.3.0";
+
+var exec_result: [][]const u8 = undefined;
+var exec_iterator = try r.getExecIterator(input);
+defer exec_iterator.deinit();
+
+exec_result = (try exec_iterator.next()).?;
+try expect(std.mem.eql(u8, exec_result[0], "v1.2.2"));
+try expect(std.mem.eql(u8, exec_result[1], "v"));
+try expect(std.mem.eql(u8, exec_result[2], "1.2.2"));
+
+exec_result = (try exec_iterator.next()).?;
+try expect(std.mem.eql(u8, exec_result[0], "v1.3.0"));
+try expect(std.mem.eql(u8, exec_result[1], "v"));
+try expect(std.mem.eql(u8, exec_result[2], "1.3.0"));
+
+try expect(try exec_iterator.next() == null);
+```
