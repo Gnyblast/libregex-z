@@ -135,7 +135,7 @@ pub const ExecIterator = struct {
 
 const Regex = struct {
     inner: *libregex.regex_t,
-    num_subexpressions: c_ulonglong,
+    num_subexpressions: usize,
     allocator: std.mem.Allocator,
 
     fn init(allocator: std.mem.Allocator, pattern: []const u8, flags: c_int) !Regex {
@@ -149,7 +149,7 @@ const Regex = struct {
 
         return .{
             .inner = res.compiled_regex.?,
-            .num_subexpressions = res.re_nsub,
+            .num_subexpressions = @intCast(res.re_nsub),
             .allocator = allocator,
         };
     }

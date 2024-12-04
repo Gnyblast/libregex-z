@@ -16,7 +16,7 @@ const Regex = libregex.Regex;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const pattern = "(v)([0-9]+.[0-9]+.[0-9]+)";
-const regex = Regex.init(gpa.allocator(), pattern, libregex.REG_EXTENDED));
+const regex = try Regex.init(gpa.allocator(), pattern, libregex.REG_EXTENDED));
 defer regex.deinit();
 ```
 
@@ -67,4 +67,10 @@ try expect(std.mem.eql(u8, exec_result[1], "v"));
 try expect(std.mem.eql(u8, exec_result[2], "1.3.0"));
 
 try expect(try exec_iterator.next() == null);
+```
+
+
+Note: If you want to know how many sub-expressions your regex has, you get it by using
+```zig
+regex.num_subexpressions;
 ```
