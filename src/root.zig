@@ -26,7 +26,7 @@ pub const MatchIterator = struct {
         self.allocator.free(self.input);
     }
 
-    pub fn next(self: *MatchIterator) ?[]const u8 {
+    pub fn next(self: *MatchIterator) !?[]const u8 {
         if (self.offset >= self.input.len - 1) {
             return null;
         }
@@ -35,7 +35,9 @@ pub const MatchIterator = struct {
         var pmatch: [1]libregex.regmatch_t = undefined;
         const result = libregex.regexec(self.regex.inner, input, 1, &pmatch, 0);
         if (result != 0) {
-            return null;
+            if (result == libregex.REG_NOMATCH) return null;
+
+            return error.OutOfMemory;
         }
         defer {
             self.offset += @as(usize, @intCast(pmatch[0].rm_so)) + 1;
@@ -200,11 +202,11 @@ test "full match iterator" {
     var iterator = try r.getMatchIterator(input);
     defer iterator.deinit();
 
-    try expect(std.mem.eql(u8, "v2.1.0", iterator.next().?));
-    try expect(std.mem.eql(u8, "v1.12.2", iterator.next().?));
-    try expect(std.mem.eql(u8, "v2.2.0", iterator.next().?));
+    try expect(std.mem.eql(u8, "v2.1.0", (try iterator.next()).?));
+    try expect(std.mem.eql(u8, "v1.12.2", (try iterator.next()).?));
+    try expect(std.mem.eql(u8, "v2.2.0", (try iterator.next()).?));
 
-    try expect(iterator.next() == null);
+    try expect(try iterator.next() == null);
 }
 
 test "exec iterator" {

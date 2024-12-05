@@ -28,7 +28,7 @@ try expect(try r.matches("v1.22.101"));
 try expect(!try r.matches("1.2.3"));
 ```
 
-### 3. Get all matches in an input
+### 3. Get matches in an input
 ```zig
 const expect = @import("std").testing.expect;
 
@@ -40,14 +40,14 @@ const input: []const u8 =
 var iterator = try r.getMatchIterator(input);
 defer iterator.deinit();
 
-try expect(std.mem.eql(u8, "v2.1.0", iterator.next().?));
-try expect(std.mem.eql(u8, "v1.12.2", iterator.next().?));
-try expect(std.mem.eql(u8, "v2.2.0", iterator.next().?));
+try expect(std.mem.eql(u8, "v2.1.0", (try iterator.next()).?));
+try expect(std.mem.eql(u8, "v1.12.2", (try iterator.next()).?));
+try expect(std.mem.eql(u8, "v2.2.0", (try iterator.next()).?));
 
-try expect(iterator.next() == null);
+try expect(try iterator.next() == null);
 ```
 
-### 4. Find sub-expressions
+### 4. Get sub-expressions
 ```zig
 
 const input: []const u8 = "Latest stable version is v1.2.2. Latest version is v1.3.0";
