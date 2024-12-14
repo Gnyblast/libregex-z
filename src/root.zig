@@ -160,6 +160,45 @@ const ExecIterator = struct {
     }
 };
 
+fn getCompileFlags(comptime flags: []const u8) error{ DuplicateFlag, UnknownFlag }!c_int {
+    var parsed_flags: c_int = 0;
+
+    var set_extended: bool = false;
+    var set_ignore_case: bool = false;
+    var set_new_line: bool = false;
+
+    for (flags) |f| {
+        var flag: c_int = undefined;
+
+        switch (f) {
+            'x' => {
+                if (set_extended) return error.DuplicateFlag;
+                set_extended = true;
+                flag = libregex.REG_EXTENDED;
+            },
+            'i' => {
+                if (set_ignore_case) return error.DuplicateFlag;
+                set_ignore_case = true;
+                flag = libregex.REG_ICASE;
+            },
+            'n' => {
+                if (set_new_line) return error.DuplicateFlag;
+                set_new_line = true;
+                flag = libregex.REG_NEWLINE;
+            },
+            else => return error.UnknownFlag,
+        }
+
+        if (parsed_flags == 0) {
+            parsed_flags = flag;
+        } else {
+            parsed_flags = parsed_flags | flag;
+        }
+    }
+
+    return parsed_flags;
+}
+
 pub const Regex = struct {
     inner: *libregex.regex_t,
 
@@ -181,6 +220,10 @@ pub const Regex = struct {
     /// Otherwise, newline acts like any other ordinary character.
     /// \
     /// \
+    /// **If an invalid value is supplied for the argument `flags`, it will cause a comptime error.**
+    /// Which is great because compile errors > runtime errors.
+    /// \
+    /// \
     /// You can combine flags. Examples: `xi`, `in`, `i`, `nix` etc...
     /// \
     /// When combining multiple flags, you can pass the flags in any order. For example `nix` has the same result as `inx` or `xni` etc.
@@ -199,42 +242,14 @@ pub const Regex = struct {
     ///     const r3 = try Regex.init(std.testing.allocator, "v[0-9]+.[0-9]+.[0-9]+", "nix");
     ///     const r3 = try Regex.init(std.testing.allocator, "[0-9]\\+ + [0-9]\\+", "");
     /// ```
-    pub fn init(allocator: std.mem.Allocator, pattern: []const u8, flags: []const u8) !Regex {
-        var parsed_flags: c_int = 0;
-
-        var set_extended: bool = false;
-        var set_ignore_case: bool = false;
-        var set_new_line: bool = false;
-
-        for (flags) |f| {
-            var flag: c_int = undefined;
-
-            switch (f) {
-                'x' => {
-                    if (set_extended) return error.DuplicateFlag;
-                    set_extended = true;
-                    flag = libregex.REG_EXTENDED;
-                },
-                'i' => {
-                    if (set_ignore_case) return error.DuplicateFlag;
-                    set_ignore_case = true;
-                    flag = libregex.REG_ICASE;
-                },
-                'n' => {
-                    if (set_new_line) return error.DuplicateFlag;
-                    set_new_line = true;
-                    flag = libregex.REG_NEWLINE;
-                },
-                else => return error.UnknownFlag,
-            }
-
-            if (parsed_flags == 0) {
-                parsed_flags = flag;
-            } else {
-                parsed_flags = parsed_flags | flag;
-            }
+    pub fn init(allocator: std.mem.Allocator, pattern: []const u8, comptime flags: []const u8) !Regex {
+        comptime {
+            _ = getCompileFlags(flags) catch |e| {
+                @compileError(std.fmt.comptimePrint("Failed to compile regex. Reason: {any}\n", .{e}));
+            };
         }
 
+        const parsed_flags = getCompileFlags(flags) catch unreachable;
         const c_str = try std.mem.Allocator.dupeZ(allocator, u8, pattern);
         defer allocator.free(c_str);
 
