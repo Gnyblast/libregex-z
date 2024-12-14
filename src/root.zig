@@ -1,3 +1,13 @@
+//! This library wraps the [C regex library](https://www.gnu.org/software/libc/manual/html_node/Regular-Expressions.html) (regex.h)
+//! and provides a very convinient API.
+//!
+//! To get started, you would have to first initialize the `Regex`.
+//! The struct `Regex` is the entry point for working with regular expressions.
+//!
+//!  Using this library you can do the following:
+//!     - check if an input matches the pattern
+//!     - find all matches in an input
+//!     - extract sub-expressions from the matches
 const std = @import("std");
 const libregex = @cImport({
     @cInclude("c_src/regex_adapter.h");
@@ -5,7 +15,7 @@ const libregex = @cImport({
 
 const expect = std.testing.expect;
 
-pub const MatchIterator = struct {
+const MatchIterator = struct {
     regex: Regex,
     allocator: std.mem.Allocator,
     offset: usize,
@@ -50,7 +60,7 @@ pub const MatchIterator = struct {
     }
 };
 
-pub const ExecIterator = struct {
+const ExecIterator = struct {
     regex: Regex,
     allocator: std.mem.Allocator,
     offset: usize,
@@ -135,12 +145,12 @@ pub const ExecIterator = struct {
     }
 };
 
-const Regex = struct {
+pub const Regex = struct {
     inner: *libregex.regex_t,
     num_subexpressions: usize,
     allocator: std.mem.Allocator,
 
-    fn init(allocator: std.mem.Allocator, pattern: []const u8, flags: c_int) !Regex {
+    pub fn init(allocator: std.mem.Allocator, pattern: []const u8, flags: c_int) !Regex {
         const c_str = try std.mem.Allocator.dupeZ(allocator, u8, pattern);
         defer allocator.free(c_str);
 
@@ -156,11 +166,11 @@ const Regex = struct {
         };
     }
 
-    fn deinit(self: Regex) void {
+    pub fn deinit(self: Regex) void {
         libregex.free_regex_t(self.inner);
     }
 
-    fn matches(self: Regex, input: []const u8) !bool {
+    pub fn matches(self: Regex, input: []const u8) !bool {
         const c_str: [:0]u8 = try std.mem.Allocator.dupeZ(self.allocator, u8, input);
         defer self.allocator.free(c_str);
 
@@ -172,11 +182,11 @@ const Regex = struct {
         return error.OutOfMemory;
     }
 
-    fn getMatchIterator(self: Regex, input: []const u8) !MatchIterator {
+    pub fn getMatchIterator(self: Regex, input: []const u8) !MatchIterator {
         return MatchIterator.init(self.allocator, self, input);
     }
 
-    fn getExecIterator(self: Regex, input: []const u8) !ExecIterator {
+    pub fn getExecIterator(self: Regex, input: []const u8) !ExecIterator {
         return ExecIterator.init(self.allocator, self, input);
     }
 };

@@ -24,9 +24,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const c_source_files_options = std.Build.Module.AddCSourceFilesOptions{
-        // .root = .{
-        //     .cwd_relative = "./src/c_src",
-        // },
         .files = &[_][]const u8{"src/c_src/regex_adapter.c"},
     };
     const c_include_path = std.Build.LazyPath{
@@ -75,4 +72,25 @@ pub fn build(b: *std.Build) void {
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_lib_unit_tests.step);
+
+    const docs = b.addTest(.{
+        .name = "zig-regex-lib",
+        .root_source_file = b.path("src/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    docs.linkLibrary(regex_c_lib);
+    docs.addIncludePath(c_include_path);
+    docs.addCSourceFiles(c_source_files_options);
+    docs.linkLibC();
+
+    const install_docs = b.addInstallDirectory(.{
+        .source_dir = docs.getEmittedDocs(),
+        .install_dir = .{ .custom = "../docs" },
+        .install_subdir = "",
+    });
+
+    const docs_step = b.step("docs", "Generate docs");
+    docs_step.dependOn(&install_docs.step);
+    docs_step.dependOn(&docs.step);
 }
