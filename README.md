@@ -16,7 +16,7 @@ const Regex = libregex.Regex;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const pattern = "(v)([0-9]+.[0-9]+.[0-9]+)";
-const regex = try Regex.init(gpa.allocator(), pattern, libregex.REG_EXTENDED));
+const regex = try Regex.init(gpa.allocator(), pattern, "x"));
 defer regex.deinit();
 ```
 

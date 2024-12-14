@@ -169,13 +169,76 @@ pub const Regex = struct {
     allocator: std.mem.Allocator,
 
     /// Initialize the Regex using this function.
-    /// `pattern` is the regular expression you wish to compile.
-    /// `flags` are used to control the way a regular expression works. Example
-    pub fn init(allocator: std.mem.Allocator, pattern: []const u8, flags: c_int) !Regex {
+    /// - `pattern` is the regular expression you wish to compile.
+    /// - `flags` are used to control the way a regular expression works.
+    /// There are 3 flags you can pass
+    ///     - `x` => extended (equivalent to [REG_EXTENDED](https://www.gnu.org/software/libc/manual/html_node/Flags-for-POSIX-Regexps.html#index-REG_005fEXTENDED)).
+    /// This flag treats the pattern as an extended regular expression, rather than as a basic regular expression.
+    ///     - `i` => ignore case (equivalent to [REG_ICASE](https://www.gnu.org/software/libc/manual/html_node/Flags-for-POSIX-Regexps.html#index-REG_005fICASE)).
+    /// This flags ignores case when matching letters.
+    ///     - `n` => new line (equivalent to [REG_NEWLINE](https://www.gnu.org/software/libc/manual/html_node/Flags-for-POSIX-Regexps.html#index-REG_005fNEWLINE)).
+    /// This flag treats a newline in string as dividing string into multiple lines, so that ‘$’ can match before the newline and ‘^’ can match after. Also, don’t permit ‘.’ to match a newline, and don’t permit ‘[^…]’ to match a newline.
+    /// Otherwise, newline acts like any other ordinary character.
+    /// \
+    /// \
+    /// You can combine flags. Examples: `xi`, `in`, `i`, `nix` etc...
+    /// \
+    /// When combining multiple flags, you can pass the flags in any order. For example `nix` has the same result as `inx` or `xni` etc.
+    /// \
+    /// You can also choose not to specify any flag. Simply pass an empty string.
+    /// \
+    /// Passing the same flag multiple times will result in an error.
+    /// \
+    /// Passing any other character will also result in an error.
+    /// \
+    /// \
+    /// Examples:
+    /// ```zig
+    ///     const r1 = try Regex.init(std.testing.allocator, "v[0-9]+.[0-9]+.[0-9]+", "i");
+    ///     const r2 = try Regex.init(std.testing.allocator, "v[0-9]+.[0-9]+.[0-9]+", "ix");
+    ///     const r3 = try Regex.init(std.testing.allocator, "v[0-9]+.[0-9]+.[0-9]+", "nix");
+    ///     const r3 = try Regex.init(std.testing.allocator, "[0-9]\\+ + [0-9]\\+", "");
+    /// ```
+    pub fn init(allocator: std.mem.Allocator, pattern: []const u8, flags: []const u8) !Regex {
+        var parsed_flags: c_int = 0;
+
+        var set_extended: bool = false;
+        var set_ignore_case: bool = false;
+        var set_new_line: bool = false;
+
+        for (flags) |f| {
+            var flag: c_int = undefined;
+
+            switch (f) {
+                'x' => {
+                    if (set_extended) return error.DuplicateFlag;
+                    set_extended = true;
+                    flag = libregex.REG_EXTENDED;
+                },
+                'i' => {
+                    if (set_ignore_case) return error.DuplicateFlag;
+                    set_ignore_case = true;
+                    flag = libregex.REG_ICASE;
+                },
+                'n' => {
+                    if (set_new_line) return error.DuplicateFlag;
+                    set_new_line = true;
+                    flag = libregex.REG_NEWLINE;
+                },
+                else => return error.UnknownFlag,
+            }
+
+            if (parsed_flags == 0) {
+                parsed_flags = flag;
+            } else {
+                parsed_flags = parsed_flags | flag;
+            }
+        }
+
         const c_str = try std.mem.Allocator.dupeZ(allocator, u8, pattern);
         defer allocator.free(c_str);
 
-        const res = libregex.compile_regex(c_str, flags);
+        const res = libregex.compile_regex(c_str, parsed_flags);
         if (res.compiled_regex == null) {
             return error.compile;
         }
@@ -223,7 +286,7 @@ pub const Regex = struct {
 };
 
 test "matches" {
-    const r = try Regex.init(std.testing.allocator, "^v[0-9]+.[0-9]+.[0-9]+", libregex.REG_EXTENDED);
+    const r = try Regex.init(std.testing.allocator, "^v[0-9]+.[0-9]+.[0-9]+", "x");
     defer r.deinit();
 
     try expect(try r.matches("v1.2.3"));
@@ -232,7 +295,7 @@ test "matches" {
 }
 
 test "full match iterator" {
-    const r = try Regex.init(std.testing.allocator, "(v)([0-9]+.[0-9]+.[0-9]+)", libregex.REG_EXTENDED);
+    const r = try Regex.init(std.testing.allocator, "(v)([0-9]+.[0-9]+.[0-9]+)", "x");
     defer r.deinit();
 
     const input: []const u8 =
@@ -251,7 +314,7 @@ test "full match iterator" {
 }
 
 test "exec iterator" {
-    const r = try Regex.init(std.testing.allocator, "(v)([0-9]+.[0-9]+.[0-9]+)", libregex.REG_EXTENDED);
+    const r = try Regex.init(std.testing.allocator, "(v)([0-9]+\\.[0-9]+\\.[0-9]+)", "x");
     defer r.deinit();
 
     const input: []const u8 = "Latest stable version is v1.2.2. Latest version is v1.3.0";
