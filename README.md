@@ -4,19 +4,26 @@ This library wraps the C regex library and provides a convenient API.
 Compatible with zig version `0.0.13`
 
 ## Installation
-1. Run `zig fetch --save https://github.com/skota-io/zig-regex`
+1. Run `zig fetch --save git+https://github.com/skota-io/zig-regex-lib`
 2. In your `build.zig` <br>
-todo
+```zig
+    const regexLib = b.dependency("libregex", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    exe.root_module.addImport("libregex", regexLib.module("libregex"));
+```
 
 ## Usage
 ### 1. Initialize
 ```zig
-const libregex = @import("zig-regex-lib");
+const libregex = @import("libregex");
 const Regex = libregex.Regex;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const pattern = "(v)([0-9]+.[0-9]+.[0-9]+)";
-const regex = try Regex.init(gpa.allocator(), pattern, "x"));
+const regex = try Regex.init(gpa.allocator(), pattern, "x");
 defer regex.deinit();
 ```
 
