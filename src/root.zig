@@ -160,7 +160,7 @@ const ExecIterator = struct {
     }
 };
 
-fn getCompileFlags(comptime flags: []const u8) error{ DuplicateFlag, UnknownFlag }!c_int {
+fn getCompileFlags(flags: []const u8) error{ DuplicateFlag, UnknownFlag }!c_int {
     var parsed_flags: c_int = 0;
 
     var set_extended: bool = false;
@@ -207,6 +207,23 @@ pub const Regex = struct {
     num_subexpressions: usize,
     allocator: std.mem.Allocator,
 
+    fn initInternal(allocator: std.mem.Allocator, pattern: []const u8, flags: []const u8) !Regex {
+        const parsed_flags = try getCompileFlags(flags);
+        const c_str = try std.mem.Allocator.dupeZ(allocator, u8, pattern);
+        defer allocator.free(c_str);
+
+        const res = libregex.compile_regex(c_str, parsed_flags);
+        if (res.compiled_regex == null) {
+            return error.compile;
+        }
+
+        return .{
+            .inner = res.compiled_regex.?,
+            .num_subexpressions = @intCast(res.re_nsub),
+            .allocator = allocator,
+        };
+    }
+
     /// Initialize the Regex using this function.
     /// - `pattern` is the regular expression you wish to compile.
     /// - `flags` are used to control the way a regular expression works.
@@ -249,20 +266,13 @@ pub const Regex = struct {
             };
         }
 
-        const parsed_flags = getCompileFlags(flags) catch unreachable;
-        const c_str = try std.mem.Allocator.dupeZ(allocator, u8, pattern);
-        defer allocator.free(c_str);
+        return initInternal(allocator, pattern, flags);
+    }
 
-        const res = libregex.compile_regex(c_str, parsed_flags);
-        if (res.compiled_regex == null) {
-            return error.compile;
-        }
-
-        return .{
-            .inner = res.compiled_regex.?,
-            .num_subexpressions = @intCast(res.re_nsub),
-            .allocator = allocator,
-        };
+    /// Same as `init` except flags are validated only during runtime.
+    /// This is useful if you do not have access to flags during comptime.
+    pub fn initWithoutComptimeFlags(allocator: std.mem.Allocator, pattern: []const u8, flags: []const u8) !Regex {
+        return initInternal(allocator, pattern, flags);
     }
 
     /// Frees the memory allocated for the compiled regex. Note: the compiled regex is created when the `init` function is called.
@@ -353,4 +363,19 @@ test "exec iterator" {
     }
 
     try expect(try exec_iterator.next() == null);
+}
+
+test "with runtime flags" {
+    var flags: []const u8 = undefined;
+
+    if (@mod(std.time.milliTimestamp(), 2) == 0) {
+        flags = "x";
+    } else {
+        flags = "";
+    }
+
+    const r = try Regex.initWithoutComptimeFlags(std.testing.allocator, "abc", flags);
+    defer r.deinit();
+
+    try expect(try r.matches("abc"));
 }
