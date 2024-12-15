@@ -4,7 +4,7 @@ This library wraps the C regex library and provides a convenient API.
 Compatible with zig version `0.0.13`
 
 ## Installation
-1. Run `zig fetch --save git+https://github.com/skota-io/zig-regex-lib`
+1. Run `zig fetch --save git+https://github.com/skota-io/libregex-z`
 2. In your `build.zig` <br>
 ```zig
 const regexLib = b.dependency("libregex", .{
@@ -16,7 +16,7 @@ exe.root_module.addImport("libregex", regexLib.module("libregex"));
 ```
 
 ## Documentation
-Detailed documentation is available here: https://skota-io.github.io/zig-regex-lib
+Detailed documentation is available here: https://skota-io.github.io/libregex-z
 <br>
 Also see the [usage section / quick start guide](#usage--quick-start-guide)
 
