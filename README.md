@@ -7,15 +7,20 @@ Compatible with zig version `0.0.13`
 1. Run `zig fetch --save git+https://github.com/skota-io/zig-regex-lib`
 2. In your `build.zig` <br>
 ```zig
-    const regexLib = b.dependency("libregex", .{
-        .target = target,
-        .optimize = optimize,
-    });
+const regexLib = b.dependency("libregex", .{
+    .target = target,
+    .optimize = optimize,
+});
 
-    exe.root_module.addImport("libregex", regexLib.module("libregex"));
+exe.root_module.addImport("libregex", regexLib.module("libregex"));
 ```
 
-## Usage
+## Documentation
+Detailed documentation is available here: https://skota-io.github.io/zig-regex-lib
+<br>
+Also see the [usage section / quick start guide](#usage--quick-start-guide)
+
+## Usage / Quick start guide
 ### 1. Initialize
 ```zig
 const libregex = @import("libregex");

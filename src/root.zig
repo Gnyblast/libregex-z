@@ -1,5 +1,5 @@
 //! This library wraps the [C regex library](https://www.gnu.org/software/libc/manual/html_node/Regular-Expressions.html) (regex.h)
-//! and provides a very convinient API.
+//! and provides a convinient API.
 //!
 //! To get started, you would have to first initialize the `Regex`.
 //! The struct `Regex` is the entry point for working with regular expressions.
