@@ -217,6 +217,10 @@ pub const Regex = struct {
             return error.compile;
         }
 
+        if (res.compile_error_code != 0) {
+            return error.compile;
+        }
+
         return .{
             .inner = res.compiled_regex.?,
             .num_subexpressions = @intCast(res.re_nsub),
@@ -378,4 +382,14 @@ test "with runtime flags" {
     defer r.deinit();
 
     try expect(try r.matches("abc"));
+}
+
+test "compile error" {
+    const test_case = &.{
+        .pattern = "[asd",
+        .expect = error.compile,
+    };
+
+    const r = Regex.initWithoutComptimeFlags(std.testing.allocator, test_case.pattern, "x");
+    try std.testing.expectError(test_case.expect, r);
 }
