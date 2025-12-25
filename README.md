@@ -1,7 +1,7 @@
 # Regex library for zig
 This library wraps the C regex library and provides a convenient API.
 
-Compatible with zig version `0.14.0`
+Compatible with zig version `0.15.0`
 
 ## Installation
 1. Run `zig fetch --save git+https://github.com/skota-io/libregex-z`
