@@ -23,10 +23,12 @@ pub fn build(b: *std.Build) void {
         },
     };
 
-    const regex_c_lib = b.addStaticLibrary(.{
+    const regex_c_lib = b.addLibrary(.{
         .name = "regex_slim",
-        .optimize = optimize,
-        .target = target,
+        .root_module = b.createModule(.{
+            .optimize = optimize,
+            .target = target,
+        }),
     });
     regex_c_lib.addIncludePath(c_include_path);
     regex_c_lib.addCSourceFiles(c_source_files_options);
@@ -38,9 +40,11 @@ pub fn build(b: *std.Build) void {
 
     // unit tests
     const unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/root.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/root.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
     unit_tests.linkLibrary(regex_c_lib);
@@ -53,12 +57,11 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_unit_tests.step);
 
     // documentation
-    const docs = b.addTest(.{
-        .name = "zig-regex-lib",
+    const docs = b.addTest(.{ .name = "zig-regex-lib", .root_module = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
-    });
+    }) });
     docs.linkLibrary(regex_c_lib);
     docs.addIncludePath(c_include_path);
     docs.addCSourceFiles(c_source_files_options);

@@ -69,12 +69,12 @@ const ExecIterator = struct {
     regex: Regex,
     allocator: std.mem.Allocator,
     offset: usize,
-    input: std.ArrayList(u8),
-    exec_results: std.ArrayList(std.ArrayList([]const u8)),
+    input: std.array_list.Managed(u8),
+    exec_results: std.array_list.Managed(std.array_list.Managed([]const u8)),
 
     /// You wouldn't call this function. It is called internally by `Regex` struct when you call the `getExecIterator` function.
     pub fn init(allocator: std.mem.Allocator, r: Regex, input: []const u8) !ExecIterator {
-        var c_str = std.ArrayList(u8).init(allocator);
+        var c_str = std.array_list.Managed(u8).init(allocator);
         for (input) |char| try c_str.append(char);
         try c_str.append(0);
 
@@ -83,7 +83,7 @@ const ExecIterator = struct {
             .input = c_str,
             .regex = r,
             .offset = 0,
-            .exec_results = std.ArrayList(std.ArrayList([]const u8)).init(allocator),
+            .exec_results = std.array_list.Managed(std.array_list.Managed([]const u8)).init(allocator),
         };
     }
 
@@ -119,7 +119,7 @@ const ExecIterator = struct {
             return error.OutOfMemory;
         }
 
-        var match_list = std.ArrayList([]const u8).init(self.allocator);
+        var match_list = std.array_list.Managed([]const u8).init(self.allocator);
 
         if (exec_result.matches[0].rm_so == exec_result.matches[0].rm_eo) {
             return null;
